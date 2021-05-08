@@ -1271,6 +1271,11 @@ int run_tunnel(struct vpn_config *config)
 		.on_ppp_if_down = on_ppp_if_down
 	};
 
+	// Init dns_split
+	tunnel.ipv4.dns_split.domains = NULL;
+	memset(&tunnel.ipv4.dns_split.ns_addrs, 0,
+	       sizeof(tunnel.ipv4.dns_split.ns_addrs));
+
 	// Step 0: get gateway host IP
 	log_debug("Resolving gateway host ip\n");
 	ret = get_gateway_host_ip(&tunnel);

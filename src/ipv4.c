@@ -1080,10 +1080,14 @@ int ipv4_add_nameservers_to_resolv_conf(struct tunnel *tunnel)
 	tunnel->ipv4.ns2_was_there = 0;
 	tunnel->ipv4.dns_suffix_was_there = 0;
 
-	if (tunnel->ipv4.ns1_addr.s_addr == 0)
+	// TODO: Split dns workaround
+	if (tunnel->ipv4.ns1_addr.s_addr == 0 &&
+	    tunnel->ipv4.dns_split.ns_addrs[0].s_addr == 0)
 		tunnel->ipv4.ns1_was_there = -1;
 
-	if (tunnel->ipv4.ns2_addr.s_addr == 0)
+	// TODO: Split dns workaround
+	if (tunnel->ipv4.ns2_addr.s_addr == 0 &&
+	    tunnel->ipv4.dns_split.ns_addrs[1].s_addr == 0)
 		tunnel->ipv4.ns2_was_there = -1;
 
 #if HAVE_RESOLVCONF
@@ -1161,14 +1165,29 @@ int ipv4_add_nameservers_to_resolv_conf(struct tunnel *tunnel)
 		strcpy(ns1, "nameserver ");
 		strncat(ns1, inet_ntoa(tunnel->ipv4.ns1_addr), 15);
 	} else {
-		ns1[0] = '\0';
+		// TODO: Split dns workaround
+		if (tunnel->ipv4.dns_split.ns_addrs[0].s_addr != 0) {
+			printf("Hitting ns_addrs[0]\n");
+			strcpy(ns1, "nameserver ");
+			strncat(ns1, inet_ntoa(tunnel->ipv4.dns_split.ns_addrs[0]), 15);
+			printf("ns1 string was: %s\n", ns1);
+		} else {
+			printf("missed ns_addrs[0]\n");
+			ns1[0] = '\0';
+		}
 	}
 
 	if (tunnel->ipv4.ns2_addr.s_addr != 0) {
 		strcpy(ns2, "nameserver ");
 		strncat(ns2, inet_ntoa(tunnel->ipv4.ns2_addr), 15);
 	} else {
-		ns2[0] = '\0';
+		// TODO: Split dns workaround
+		if (tunnel->ipv4.dns_split.ns_addrs[1].s_addr != 0) {
+			strcpy(ns2, "nameserver ");
+			strncat(ns2, inet_ntoa(tunnel->ipv4.dns_split.ns_addrs[1]), 15);
+		} else {
+			ns2[0] = '\0';
+		}
 	}
 
 	if (tunnel->ipv4.dns_suffix != NULL) {
@@ -1176,7 +1195,14 @@ int ipv4_add_nameservers_to_resolv_conf(struct tunnel *tunnel)
 		strncat(dns_suffix, tunnel->ipv4.dns_suffix, MAX_DOMAIN_LENGTH);
 		replace_char(dns_suffix, ';', ' ');
 	} else {
-		dns_suffix[0] = '\0';
+		// TODO: Split dns workaround
+		if (tunnel->ipv4.dns_split.domains != NULL) {
+			strcpy(dns_suffix, "search ");
+			strncat(dns_suffix, tunnel->ipv4.dns_split.domains,
+				MAX_DOMAIN_LENGTH);
+		} else {
+			dns_suffix[0] = '\0';
+		}
 	}
 
 #if HAVE_RESOLVCONF
@@ -1353,16 +1379,37 @@ int ipv4_del_nameservers_from_resolv_conf(struct tunnel *tunnel)
 	if (tunnel->ipv4.ns1_addr.s_addr != 0) {
 		strcpy(ns1, "nameserver ");
 		strncat(ns1, inet_ntoa(tunnel->ipv4.ns1_addr), 15);
+		// TODO: Split dns workaround
+	} else if (tunnel->ipv4.dns_split.ns_addrs[0].s_addr != 0) {
+		strcpy(ns1, "nameserver ");
+		strncat(ns1, inet_ntoa(tunnel->ipv4.dns_split.ns_addrs[0]), 15);
 	}
+
 	ns2[0] = '\0';
 	if (tunnel->ipv4.ns2_addr.s_addr != 0) {
 		strcpy(ns2, "nameserver ");
 		strncat(ns2, inet_ntoa(tunnel->ipv4.ns2_addr), 15);
+		// TODO: Split dns workaround
+	} else if (tunnel->ipv4.dns_split.ns_addrs[1].s_addr != 0) {
+		strcpy(ns2, "nameserver ");
+		strncat(ns2, inet_ntoa(tunnel->ipv4.dns_split.ns_addrs[1]), 15);
 	}
+
 	dns_suffix[0] = '\0';
 	if (tunnel->ipv4.dns_suffix != NULL && tunnel->ipv4.dns_suffix[0] != '\0') {
 		strcpy(dns_suffix, "search ");
 		strncat(dns_suffix, tunnel->ipv4.dns_suffix, MAX_DOMAIN_LENGTH);
+		// TODO: Split dns workaround
+	} else if (tunnel->ipv4.dns_split.domains != NULL) {
+		/* If dns_suffix was not supplied see if split_dns was maybe
+		 * configured If so copy use this info. This is a work around
+		 * to be able to use some sort of vpn if split support is not
+		 * supported. Basically set the first split domain as global
+		 * domain.
+		 */
+		strcpy(dns_suffix, "search ");
+		strncat(dns_suffix, tunnel->ipv4.dns_split.domains,
+			MAX_DOMAIN_LENGTH);
 	}
 
 	file = freopen("/etc/resolv.conf", "w", file);
