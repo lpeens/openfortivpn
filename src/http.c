@@ -809,6 +809,26 @@ int auth_request_vpn_allocation(struct tunnel *tunnel)
 	return http_request(tunnel, "GET", "/remote/fortisslvpn", "", NULL, NULL);
 }
 
+void populate_split_dns(struct tunnel *tunnel, const char *val)
+{
+	char *dns_server;
+	const char *tmp;
+	int i;
+
+	for (i = 0; i < MAX_SPLIT_NS_ADDR; i++) {
+		char search[NS_SEARCH_STR_LEN + 1];
+
+		snprintf(search, NS_SEARCH_STR_LEN, "dnsserver%d=", i + 1);
+		if (xml_find(' ', (const char *) search, val, 1)) {
+			tmp = xml_find(' ', (const char *) search, val, 1);
+			dns_server = xml_get(tmp);
+			log_debug("found split dnsserver%d %s in xml config\n", i + 1, dns_server);
+			tunnel->ipv4.dns_split.ns_addrs[i].s_addr = inet_addr(dns_server);
+			free(dns_server);
+		}
+	}
+}
+
 
 static int parse_xml_config(struct tunnel *tunnel, const char *buffer)
 {
@@ -846,6 +866,18 @@ static int parse_xml_config(struct tunnel *tunnel, const char *buffer)
 		}
 	}
 
+	// The it could be split-dns instead of global dns
+	val = buffer;
+	while ((val = xml_find('<', "split-dns", val, 2))) {
+		if (xml_find(' ', "domains=", val, 1)) {
+			tunnel->ipv4.dns_split.domains
+			        = xml_get(xml_find(' ', "domains=", val, 1));
+			log_debug("found split-dns suffix %s in xml config\n",
+			          tunnel->ipv4.dns_split.domains);
+			break;
+		}
+	}
+
 	// The dns servers
 	val = buffer;
 	while ((val = xml_find('<', "dns", val, 2))) {
@@ -859,6 +891,11 @@ static int parse_xml_config(struct tunnel *tunnel, const char *buffer)
 			free(dns_server);
 		}
 	}
+
+	// The split-dns servers
+	val = buffer;
+	while ((val = xml_find('<', "split-dns", val, 2)))
+		populate_split_dns(tunnel, val);
 
 	// Routes the tunnel wants to push
 	val = xml_find('<', "split-tunnel-info", buffer, 1);

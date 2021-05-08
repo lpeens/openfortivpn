@@ -54,6 +54,13 @@ struct rtentry {
 #define ROUTE_IFACE_LEN 32
 #define MAX_SPLIT_ROUTES 65535
 #define STEP_SPLIT_ROUTES 32
+#define MAX_SPLIT_NS_ADDR 2
+#define NS_SEARCH_STR_LEN 12		/* len(dnsserverXX=)		*/
+
+struct split_dns {
+	char		*domains;
+	struct in_addr	ns_addrs[MAX_SPLIT_NS_ADDR];
+};
 
 struct ipv4_config {
 	struct in_addr	ip_addr;
@@ -71,6 +78,8 @@ struct ipv4_config {
 	struct rtentry	gtw_rt; // route to access VPN gateway
 	struct rtentry	ppp_rt; // new default route through VPN
 	struct rtentry	*split_rt; // split VPN routes
+
+	struct split_dns dns_split;
 };
 
 // Dummy function to make gcc 6 happy

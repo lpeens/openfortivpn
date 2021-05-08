@@ -1369,5 +1369,17 @@ err_tunnel:
 		free(tunnel.ipv4.split_rt);
 		tunnel.ipv4.split_rt = NULL;
 	}
+
+	// Free dns_suffix
+	if (tunnel.ipv4.dns_suffix != NULL) {
+		free(tunnel.ipv4.dns_suffix);
+		tunnel.ipv4.dns_suffix = NULL;
+	}
+
+	// Free split_dns_suffix
+	if (tunnel.ipv4.dns_split.domains != NULL) {
+		free(tunnel.ipv4.dns_split.domains);
+		tunnel.ipv4.dns_split.domains = NULL;
+	}
 	return ret;
 }
